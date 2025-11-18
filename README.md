@@ -4,12 +4,11 @@ PaperPal is a **RAG-based** research assistant designed to help users:
 
 - ingest and store academic papers,
 - search and browse their personal paper inventory,
-- view metadata and abstracts,
 - take notes per paper,
 - chat about papers using an integrated LLM agent,
 - and maintain a vector database for semantic search.
 
-⚙️This project is **under active development** and will later evolve into a scalable multi-user web app with an independent backend API.
+⚙️This project is **under active development** 
 
 <img width="1000" height="867" alt="image" src="assets/pic1.png" />
 

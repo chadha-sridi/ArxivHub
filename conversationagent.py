@@ -4,6 +4,7 @@ import gradio as gr
 from operator import itemgetter
 from pathlib import Path
 from faiss import IndexFlatL2
+from langchain_core.runnables import RunnableLambda
 from langchain_core.runnables.passthrough import RunnableAssign
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
@@ -57,14 +58,19 @@ class ConversationAgent:
         self.convstore = default_FAISS()  # in-memory conversation memory
 
         # Chat prompt template
-        self.chat_prompt = ChatPromptTemplate.from_messages([("system",
-        "You are a document chatbot. Help the user as they ask questions about documents."
-        " User messaged just asked: {input}\n\n"
-        " From this, we have retrieved the following potentially-useful info: "
-        " Conversation History Retrieval:\n{history}\n\n"
-        " Document Retrieval:\n{context}\n\n"
-        " (Answer only from retrieval. Only cite sources that are used. Make your response conversational.)"
-        ), ('user', '{input}')])
+        self.chat_prompt = ChatPromptTemplate.from_messages([
+        ("system",
+            "You are a document chatbot. Answer questions using only the retrieved context.\n\n"
+            "Conversation History:\n{history}\n\n"
+            "Retrieved Documents:\n{context}\n\n"
+            "Instructions:\n"
+            "- Answer ONLY using the information above\n"
+            "- Cite sources like [1], [2] when used\n"
+            "- If there is no relevant information, answer 'I don't know' or ask for clarification.\n"
+            "- Keep responses conversational"
+        ),
+        ('user', '{input}')
+    ])
             
         self.retrieval_chain = (
         {'input' : (lambda x: x)}
@@ -82,51 +88,40 @@ class ConversationAgent:
             metadatas=[{"role": "user"}, {"role": "assistant"}]
         )
     
-    def chat_gen(self, user_input, history=[], return_buffer=True):
+    def chat_gen(self, user_input, return_buffer=True):
         buffer = ""
         ## 1) perform the retrieval based on the input message
         retrieval = self.retrieval_chain.invoke(user_input)
-        line_buffer = ""
         ## 2) stream the results of the stream_chain
         for token in self.stream_chain.stream(retrieval):
             buffer += token
             yield buffer if return_buffer else token
-        ## Save the chat exchange to the conversation memory buffer
-        self.save_message(user_input, buffer)
+        ## Save the chat exchange to the conversation memory buffer : convstore
+        self.save_message(user_input, buffer) 
 
-def gradio_chat(user_input, history=[]):
-    """
-    Gradio callback for chat.
-    - history: list of [user_msg, agent_msg]
-    """
-    response_chunks = []
-    for chunk in agent.chat_gen(user_input, return_buffer=True):
-        response_chunks.append(chunk)
-    response_text = response_chunks[-1]  # final output
-
-    # update chat history for Gradio
-    history.append((user_input, response_text))
-    return history, history
 # ====================== TEST / MAIN ======================
 if __name__ == "__main__":
     user_id = "demo_user"
     docstore_path = Path(f"vectorstores/{user_id}/index")
     docstore = FAISS.load_local(docstore_path, embedder, allow_dangerous_deserialization=True)
 
-    agent = ConversationAgent(user_id=user_id, docstore=docstore)
-
-    # test_question ="Tell me about rag"
+    agent = ConversationAgent(user_id=user_id, docstore=docstore)   
+    # test_question ="Tell me about attention"
     # for response in agent.chat_gen(test_question, return_buffer=False):
-    #     print(response, end='')
+    #     print(response, end='') 
     
     ########## DEMO INTERFACE ########
     initial_msg = (
     "Hello! I am a document chat agent here to help you!"
     # f" I have access to the following documents: {doc_string}\n\nHow can I help you?"
     )
-    chatbot = gr.Chatbot(value = [[None, initial_msg]])
-    demo = gr.ChatInterface(agent.chat_gen, chatbot=chatbot).queue()
+    chatbot = gr.Chatbot(
+    value=[{"role": "assistant", "content": initial_msg}],
+    type="messages"
+    )
 
+    demo = gr.ChatInterface(agent.chat_gen, chatbot=chatbot, type="messages").queue()
+    
     try:
         demo.launch(debug=True, share=True, show_api=False)
         demo.close()

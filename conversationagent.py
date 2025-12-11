@@ -4,7 +4,6 @@ import gradio as gr
 from operator import itemgetter
 from pathlib import Path
 from faiss import IndexFlatL2
-from langchain_core.runnables import RunnableLambda
 from langchain_core.runnables.passthrough import RunnableAssign
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
@@ -34,15 +33,22 @@ def default_FAISS():
         normalize_L2=False
     )
 
-def docs2str(docs, title="Document"):
-    """Useful utility for making chunks into context string. Optional, but useful"""
+def docs2str(docs):
+    """Convert documents to formatted string with source citations."""
+    if not docs:
+        return "No relevant documents found."
+    
     out_str = ""
-    for doc in docs:
-        doc_name = getattr(doc, 'metadata', {}).get('Title', title)
-        if doc_name:
-            out_str += f"[Quote from {doc_name}] "
-        out_str += getattr(doc, 'page_content', str(doc)) + "\n"
-    return out_str
+    for i, doc in enumerate(docs, 1):
+        metadata = getattr(doc, 'metadata', {})
+        paper_title = metadata.get('Title', 'Unknown')
+        
+        # Format: [Source N: paper_id] content
+        out_str += f"[Source {i}: {paper_title}]\n"
+        out_str += getattr(doc, 'page_content', str(doc)) + "\n\n"
+    
+    return out_str.strip()
+
 # ====================== CONVERSATION AGENT ======================
 class ConversationAgent:
     """
@@ -55,17 +61,15 @@ class ConversationAgent:
     def __init__(self, user_id: str, docstore: FAISS):
         self.user_id = user_id
         self.docstore = docstore  #To be loaded
-        self.convstore = default_FAISS()  # in-memory conversation memory
 
         # Chat prompt template
         self.chat_prompt = ChatPromptTemplate.from_messages([
         ("system",
             "You are a document chatbot. Answer questions using only the retrieved context.\n\n"
-            "Conversation History:\n{history}\n\n"
+            # "Conversation History:\n{history}\n\n"
             "Retrieved Documents:\n{context}\n\n"
             "Instructions:\n"
             "- Answer ONLY using the information above\n"
-            "- Cite sources like [1], [2] when used\n"
             "- If there is no relevant information, answer 'I don't know' or ask for clarification.\n"
             "- Keep responses conversational"
         ),
@@ -74,20 +78,15 @@ class ConversationAgent:
             
         self.retrieval_chain = (
         {'input' : (lambda x: x)}
-        ## retrieve history & context from convstore & docstore, respectively.
-        | RunnableAssign({'history' : itemgetter("input")| self.convstore.as_retriever()| LongContextReorder().transform_documents | docs2str })
-        | RunnableAssign({'context' : itemgetter("input")| self.docstore.as_retriever() | LongContextReorder().transform_documents | docs2str})
+        ## retrieve context from docstore.
+        | RunnableAssign({'context' : itemgetter("input")
+        | self.docstore.as_retriever() #search_type="similarity_score_threshold",search_kwargs={"score_threshold": 0.1, "k": 8}
+        | LongContextReorder().transform_documents 
+        | docs2str})
         )
-
+        
         self.stream_chain = self.chat_prompt | instruct_llm | StrOutputParser()
 
-    def save_message(self, user_input: str, agent_output: str):
-        """Save conversation exchange with role metadata."""
-        self.convstore.add_texts(
-            [user_input, agent_output],
-            metadatas=[{"role": "user"}, {"role": "assistant"}]
-        )
-    
     def chat_gen(self, user_input, return_buffer=True):
         buffer = ""
         ## 1) perform the retrieval based on the input message
@@ -96,8 +95,7 @@ class ConversationAgent:
         for token in self.stream_chain.stream(retrieval):
             buffer += token
             yield buffer if return_buffer else token
-        ## Save the chat exchange to the conversation memory buffer : convstore
-        self.save_message(user_input, buffer) 
+        
 
 # ====================== TEST / MAIN ======================
 if __name__ == "__main__":

@@ -83,7 +83,6 @@ class PaperVectorStore:
             if len(c.page_content) > 200: # Filter out tiny chunks
                 c.metadata = {"paper_id": arxiv_id, "Title" : c.metadata.get("Title")}   # assign minimal metadata
                 chunks.append(c)
-        breakpoint()
         return chunks
 
     def update_paper_metadata(self, doc, arxiv_id, len_chunks):

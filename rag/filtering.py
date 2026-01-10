@@ -115,24 +115,3 @@ def FuzzyMagic(state: State, metadata_json: Dict[str, Dict], top_n: int = 4) -> 
     # Sort by score descending and return top_n
     top_papers = sorted(preselected_papers, key=lambda pid: scores[pid], reverse=True)[:top_n]
     return {"arxivIDs": top_papers}
-
-if __name__ == "__main__":
-    paper_metadata_path = Path("user_data/demo_user/paper_metadata.json")
-     
-    with open(paper_metadata_path, "r") as f:
-        metadata_json = json.load(f)
-
-    # # === Example query hints extracted from the LLM ===
-    from query_analysis import analyze_query 
-    from langchain_core.messages import HumanMessage
-    examples = [
-    "Can you summarize the key contributions of the Attention Is All You Need paper?",
-    "How do diffusion models compare to GANs for image generation in recent computer vision papers?",
-    ]
-    for i, query in enumerate(examples, start=1):
-        # Initialize a fresh state
-        state = State(messages=[HumanMessage(content=query)])
-        # Run query analysis
-        updated_state = analyze_query(state)
-        top_papers = FuzzyMagic(updated_state, metadata_json, top_n=4)
-        print("Top papers by fuzzy matching:", top_papers)

@@ -1,9 +1,9 @@
 import os
 from pathlib import Path
 from dotenv import load_dotenv
-from langchain_nvidia_ai_endpoints import NVIDIAEmbeddings
 from qdrant_client import QdrantClient, models
-
+from langchain_nvidia_ai_endpoints import ChatNVIDIA
+from langchain_nvidia_ai_endpoints import NVIDIAEmbeddings
 load_dotenv()
 
 # Env variables
@@ -15,6 +15,8 @@ QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 # Embedder
 embedder = NVIDIAEmbeddings(model=EMBEDDING_MODEL, truncate="END")
 EMBED_DIM = len(embedder.embed_query("test"))
+# LLM
+llm = ChatNVIDIA(model="meta/llama-3.2-3b-instruct")
 
 # Qdrant client
 qdrant_client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)

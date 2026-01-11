@@ -1,6 +1,6 @@
 from config import llm
-from schemas import State 
-from prompts import get_conversation_summary_prompt
+from core.schemas import State 
+from core.prompts import get_conversation_summary_prompt
 
 def analyze_chat_and_summarize(state: State):
     """

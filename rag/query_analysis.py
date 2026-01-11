@@ -1,7 +1,7 @@
 import os
 from config import llm
-from schemas import State, QueryAnalysis
-from prompts import get_query_analysis_prompt
+from core.schemas import State, QueryAnalysis
+from core.prompts import get_query_analysis_prompt
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 
 def analyze_query(state: State) -> dict:

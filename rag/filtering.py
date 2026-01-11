@@ -1,6 +1,6 @@
 import re
 import json 
-from schemas import State
+from core.schemas import State
 from pathlib import Path
 from rapidfuzz import fuzz
 from statistics import mean

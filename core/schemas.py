@@ -19,10 +19,6 @@ class MetadataHints(BaseModel):
         default_factory=list,
         description="Publication years referenced or implied in the user query (e.g., '2020', 'recent', 'last year')"
     )
-    arxivIDs: List[str] = Field(
-        default_factory=list,
-        description="Arxiv IDs referenced in the user query (e.g., '1706.03762' )"
-    )
 
 class State(MessagesState):
     """State for the workflow"""
@@ -56,5 +52,5 @@ class QueryAnalysis(BaseModel):
     )
     metadataHints: MetadataHints = Field(
         default_factory=MetadataHints,
-        description="metadata (titles, authors, topics, publication years, arviv ids) mentionned in the user query"
+        description="metadata (titles, authors, topics, publication years) mentionned in the user query"
     )

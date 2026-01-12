@@ -23,7 +23,7 @@ def get_query_analysis_prompt() -> str:
         4. If the question is unclear, provide a brief clarification message explaining what is missing or ambiguous.
         5. Carefully analyze the query and populate the predefined metadata fields with information from the original query.   
         Guidelines for metadata extarction : 
-        - Extract metadata ONLY into the predefined fields: titles, authors, topics, publicationYears, arxivIDs.
+        - Extract metadata ONLY into the predefined fields: titles, authors, topics, publicationYears.
         - Do NOT invent new metadata fields.
         - For topics, include any methods, models, domains, or research concepts mentioned in the query.
         - For publicationYears, convert explicit or relative references (e.g., '2021', 'after 2020', 'last year') into integers when possible.

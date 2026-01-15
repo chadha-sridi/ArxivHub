@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from pydantic import BaseModel, Field
+from langchain_core.documents import Document
 from langgraph.graph import MessagesState
 from typing import Optional, Literal, List, Dict, Any
 from langchain_qdrant import QdrantVectorStore
@@ -34,7 +35,7 @@ class State(MessagesState):
     metadataHintPresent: bool = False
     metadataHints: MetadataHints = Field(default_factory=MetadataHints)
     arxivIDs: List[str] = []
-    retrievedChunkIDs: List[str] = []
+    retrievedDocs: List[Document] = []
     confidenceScores: List[float] = []
     relevancePassed: bool = True
     finalAnswer: Optional[str]

@@ -1,3 +1,22 @@
+def get_conversation_summary_prompt() -> str:
+    return """
+        Summarize the conversation in 1–2 concise sentences.
+
+        Include:
+        - Main topics discussed
+        - Key facts or entities
+        - Any unresolved questions
+
+        Exclude:
+        - Greetings
+        - Misunderstandings
+        - Off-topic content
+
+        If no meaningful information exists, return an empty string.
+
+        Output only the summary. No explanations.
+        """
+
 def get_query_analysis_prompt() -> str:
     return """
         Analyze the user query and extract the following information based ONLY on the query: 
@@ -41,22 +60,35 @@ def get_query_analysis_prompt() -> str:
             arxivIDs: []
               
         """
+        
+def get_generation_prompt(context_xml: str) -> str:
+    return f"""You are a world-class Research Scientist. 
+    Your goal is to synthesize a response using ONLY the research snippets provided in the context below.
 
-def get_conversation_summary_prompt() -> str:
-    return """
-        Summarize the conversation in 1–2 concise sentences.
+    <context>
+    {context_xml}
+    </context>
 
-        Include:
-        - Main topics discussed
-        - Key facts or entities
-        - Any unresolved questions
+    <instructions>
+    1. **Source Analysis**: Identify which snippets contain the facts needed to answer the user's query.
+    2. **Strict Grounding**: Every sentence in your answer MUST be supported by at least one source. Use inline citations [1].
+    3. **No External Knowledge**: If the context does not have the answer, state that clearly.
+    4. **Mapping Verification**: In your <thinking> block, perform a 'Source-to-Claim' mapping.
+    </instructions>
 
-        Exclude:
-        - Greetings
-        - Misunderstandings
-        - Off-topic content
+    Your response MUST follow this exact structure:
 
-        If no meaningful information exists, return an empty string.
+    <thinking>
+    Identify the relevant sources using their [Source Index].
+    Plan: "I will use [Source Index] to explain [Claim X] and [Source Index] to support [Claim Y]."
+    </thinking>
 
-        Output only the summary. No explanations.
-        """
+    <answer>
+    [Provide your well-cited, professional answer here. Use inline citations like [1] or [1, 2].]
+
+    ---
+    **Sources used in this response:**
+    - [Source Index] Arxiv ID: Title
+    - [Source Index] Arxiv ID: Title
+    </answer>
+    """

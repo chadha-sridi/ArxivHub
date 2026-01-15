@@ -31,18 +31,15 @@ def retrieve(state: State, runtime: Runtime[RuntimeContext]) -> Dict[str, List]:
         filter=Filter(must=conditions)
     )
    
-    retrieved_arxiv_ids = []
-    retrieved_chunk_ids = []
+    retrieved_docs = []
     confidence_scores = []
 
     for doc, score in docs_with_scores:
         if score >= score_threshold: 
-            retrieved_arxiv_ids.append(doc.metadata.get("paper_id"))
-            retrieved_chunk_ids.append(doc.metadata.get("_id"))
+            retrieved_docs.append(doc)
             confidence_scores.append(score)
     
     return {
-        "arxivIDs": retrieved_arxiv_ids,
-        "retrievedChunkIDs": retrieved_chunk_ids,
+        "retrievedDocs": retrieved_docs,
         "confidenceScores": confidence_scores,
     }

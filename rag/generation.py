@@ -39,13 +39,15 @@ def generate(state: State):
     context_xml = "\n".join(context_blocks)
 
     system_prompt = get_generation_prompt(context_xml)
-
+    user_question = state.get("rewrittenQuestion") or state.get("originalQuestion")
     response = llm.invoke([
         SystemMessage(content=system_prompt),
-        HumanMessage(content=state["rewrittenQuestion"])
+        HumanMessage(content=user_question)
     ])
     # Extract the clean answer (without <thinking>)
     clean_answer = extract_clean_answer(response.content)
+    if not clean_answer:
+        response.content
 
     return {
         "messages": [response],          

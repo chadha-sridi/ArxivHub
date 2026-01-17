@@ -40,7 +40,7 @@ def fuzzy_match_papers(state: State, runtime: Runtime[RuntimeContext]) -> Dict[s
     scope = state.get("paperScope", "multiple") 
     top_n = 2 if scope == "single" else 4 
     # Return empty if no hints provided
-    if not any([
+    if query_hints is None or not any([
         query_hints.titles, query_hints.authors, query_hints.topics, query_hints.publicationYears
     ]):
         return {"arxivIDs": []}

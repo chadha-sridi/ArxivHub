@@ -15,6 +15,9 @@ def retrieve(state: State, runtime: Runtime[RuntimeContext]) -> Dict[str, List]:
     top_K = settings.get("retrieval_top_k", 5)
     arxiv_ids = state.get("arxivIDs", [])
     query = state.get("rewrittenQuestion", "")
+    if not query or len(query) < 2:
+        # Skip retrieval
+        return {"retrievedDocs": []}
 
     # Metadata filtering
     conditions = [
@@ -38,7 +41,7 @@ def retrieve(state: State, runtime: Runtime[RuntimeContext]) -> Dict[str, List]:
         if score >= score_threshold: 
             retrieved_docs.append(doc)
             confidence_scores.append(score)
-    
+            
     return {
         "retrievedDocs": retrieved_docs,
         "confidenceScores": confidence_scores,

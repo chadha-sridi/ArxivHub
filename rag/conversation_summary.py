@@ -1,5 +1,6 @@
 from config import llm
 from core.schemas import State 
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from core.prompts import get_conversation_summary_prompt
 
 def summarize_conversation_history(state: State):

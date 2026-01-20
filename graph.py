@@ -6,11 +6,19 @@ from rag import (
     analyze_query,
     fuzzy_match_papers,
     retrieve, 
-    generate
+    generate, 
+    handle_general_talk
 )
 
 # Initialize checkpointer
 checkpointer = InMemorySaver()
+
+# Routing function
+def decide_next_step(state: State):
+    """Decide on general talk vs RAG"""
+    if state["intent"] == "casual":
+        return "casual"
+    return "research"
 
 # Build workflow graph
 graph_builder = StateGraph(State, context_schema=RuntimeContext)
@@ -21,14 +29,23 @@ graph_builder.add_node("analyze_query", analyze_query)
 graph_builder.add_node("scope_context", fuzzy_match_papers)
 graph_builder.add_node("retrieve", retrieve)
 graph_builder.add_node("generate", generate)
+graph_builder.add_node("handle_general_talk", handle_general_talk)
 
 # Edges
 graph_builder.add_edge(START, "summarize_conv")
 graph_builder.add_edge("summarize_conv", "analyze_query")
-graph_builder.add_edge("analyze_query", "scope_context")
+graph_builder.add_conditional_edges(
+    "analyze_query", # routing RAG or direct generation according to the user query 
+    decide_next_step,
+    {
+        "casual": "handle_general_talk",
+        "research": "scope_context" # RAG path
+    }
+)
 graph_builder.add_edge("scope_context", "retrieve")
 graph_builder.add_edge("retrieve", "generate")
 graph_builder.add_edge("generate", END)
+graph_builder.add_edge("handle_general_talk", END)
 
 # Compile graph
 workflow = graph_builder.compile(

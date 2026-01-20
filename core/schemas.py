@@ -28,12 +28,13 @@ class State(MessagesState):
     # messages: Annotated[Sequence[BaseMessage], add_messages]
     conversationSummary: str = ""
     originalQuestion: str = ""
+    intent: Literal["research", "casual"] = "research"
     questionIsClear: bool = True
     rewrittenQuestion: str = ""
     paperScope: Literal["single", "multiple"] = "multiple"
     chosenDatasource: Literal["vectorstore", "web"] = "vectorstore"
     metadataHintPresent: bool = False
-    metadataHints: MetadataHints = Field(default_factory=MetadataHints)
+    metadataHints: Optional[MetadataHints] = Field(default_factory=MetadataHints)
     arxivIDs: List[str] = []
     retrievedDocs: List[Document] = []
     confidenceScores: List[float] = []
@@ -51,6 +52,9 @@ class RuntimeContext:
     })
 
 class QueryAnalysis(BaseModel):
+    intent: Literal["research", "casual"] = Field(
+        description="Choose research' for questions about papers or science and 'casual' for greetings/thanks and random chat."
+    )
     is_clear: bool = Field(
         description="Indicates if the user's question is clear and answerable."
     )

@@ -22,12 +22,13 @@ def get_query_analysis_prompt() -> str:
         Analyze the user query and extract the following information based ONLY on the query: 
 
         Tasks: 
-        1. Decide if the query is clear enough to answer.
+        1. Classify the user's intent as 'casual' only for greetings or non-research small talk. If the user mentions papers, topics, or data, classify as 'research'."
+        2. Decide if the query is clear enough to answer.
         Guidelines: 
         - Use the conversation context ONLY if it is needed to understand the query OR to determine the domain when the query itself is ambiguous.
         - If the intent is unclear or meaningless, mark as unclear.
-        2. Rewrite the query into one concise and self-contained question highlighting the user's intent (e.g., finding a paper, comparing methods from specific papers, summarizing a topic, etc.).
-        3. Determine the paper scope of the question.
+        3. Rewrite the query into one concise and self-contained question highlighting the user's intent (e.g., finding a paper, comparing methods from specific papers, summarizing a topic, etc.).
+        4. Determine the paper scope of the question.
         Guidelines for paperScope:
         - Set paperScope = "single" if the user explicitly mentions:
             - ONLY one specific paper title,
@@ -39,8 +40,8 @@ def get_query_analysis_prompt() -> str:
             - the user asks for comparisons, trends, surveys, or "recent papers",
             - or multiple papers/authors are implied.
         - When in doubt, choose "multiple".
-        4. If the question is unclear, provide a brief clarification message explaining what is missing or ambiguous.
-        5. Carefully analyze the query and populate the predefined metadata fields with information from the original query.   
+        5. If the question is unclear, provide a brief clarification message explaining what is missing or ambiguous.
+        6. Carefully analyze the query and populate the predefined metadata fields with information from the original query.   
         Guidelines for metadata extarction : 
         - Extract metadata ONLY into the predefined fields: titles, authors, topics, publicationYears.
         - Do NOT invent new metadata fields.
@@ -62,7 +63,8 @@ def get_query_analysis_prompt() -> str:
         """
         
 def get_generation_prompt(context_xml: str) -> str:
-    return f"""You are a world-class Research Scientist. 
+    return f"""
+    You are a world-class Research Scientist. 
     Your goal is to synthesize a response using ONLY the research snippets provided in the context below.
 
     <context>
@@ -91,4 +93,17 @@ def get_generation_prompt(context_xml: str) -> str:
     - [Source Index] Arxiv ID: Title
     - [Source Index] Arxiv ID: Title
     </answer>
+    """
+
+def get_casual_generation_prompt() -> str:
+    return """
+    You are ArXivHub, a professional and friendly research assistant.
+    Current Goal: Respond to the user's small talk, greeting, or general inquiry.
+
+    Guidelines:
+    1. Be polite and concise.
+    2. If the user asks who you are, explain that you help answer questions about research papers added to the user's inventory using Retrieval-Augmented Generation for precise and grounded responses.
+    3. If the user asks a general knowledge question (e.g., "What is photosynthesis?" or "how to make tomato sauce?"), answer it briefly using your internal knowledge.
+    4. If the user seems to be trying to start a research task but didn't provide enough info, gently guide them to ask about a specific topic or paper.
+    5. Reply only based on the query.
     """

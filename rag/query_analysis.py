@@ -41,6 +41,7 @@ def analyze_query(state: State) -> dict:
     )
     rewritten = analysis.rewrittenQuestion.strip() or last_user_msg
     return {
+        "intent": analysis.intent,
         "questionIsClear": True,
         "rewrittenQuestion": rewritten,
         "paperScope": analysis.paperScope,

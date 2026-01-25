@@ -2,6 +2,8 @@ import os
 import json
 import logging
 import asyncio
+from pathlib import Path
+from filelock import FileLock
 from typing import List, Dict, Any
 from datetime import datetime
 from qdrant_client import models
@@ -24,30 +26,65 @@ text_splitter = RecursiveCharacterTextSplitter(
     separators=SEPARATORS,
 )
 
+# Helper to get lock path for a user
+def get_lock_path(user_id: str) -> Path:
+    """Get the lock file path for a specific user"""
+    user_dir = BASE_USER_DATA_DIR / user_id
+    user_dir.mkdir(parents=True, exist_ok=True)
+    return user_dir / "paper_metadata.json.lock"
+
 async def load_paper_metadata(user_id: str) -> Dict[str, Any]:
-    """Load paper metadata from JSON file."""
-    
+    """Load paper metadata from JSON file with file locking."""
     user_dir = BASE_USER_DATA_DIR / user_id
     user_dir.mkdir(parents=True, exist_ok=True)
     paper_metadata_path = user_dir / "paper_metadata.json"
-    if paper_metadata_path.exists():
-        try:
-            def _read():
-                with open(paper_metadata_path, "r") as f:
-                    return json.load(f)
-            return await asyncio.to_thread(_read)
-        except json.JSONDecodeError:
+    lock_path = get_lock_path(user_id)
+    
+    def _read():
+        with FileLock(lock_path, timeout=10):
+            if paper_metadata_path.exists():
+                try:
+                    with open(paper_metadata_path, "r") as f:
+                        return json.load(f)
+                except json.JSONDecodeError:
+                    logging.warning(f"Corrupted metadata file for user {user_id}, returning empty dict")
+                    return {}
             return {}
-    return {}
+    
+    return await asyncio.to_thread(_read)
 
 async def save_paper_metadata(user_id: str, paper_metadata: Dict[str, Any]) -> None:
+    """Save paper metadata to JSON file with file locking."""
     user_dir = BASE_USER_DATA_DIR / user_id
     user_dir.mkdir(parents=True, exist_ok=True)
     paper_metadata_path = user_dir / "paper_metadata.json"
+    lock_path = get_lock_path(user_id)
+    
     def _write():
-        with open(paper_metadata_path, "w") as f:
-            json.dump(paper_metadata, f, indent=2)
+        with FileLock(lock_path, timeout=10):
+            with open(paper_metadata_path, "w") as f:
+                json.dump(paper_metadata, f, indent=2)
+    
     await asyncio.to_thread(_write)
+
+async def update_paper_metadata(user_id: str, paper_metadata: Dict[str, Any], doc_metadata: Dict[str, Any], arxiv_id: str, len_chunks: int) -> None:   
+    paper_metadata[arxiv_id] = {
+        'Title': doc_metadata.get('Title', 'Unknown'),
+        'Authors': doc_metadata.get('Authors', []),
+        'Published': doc_metadata.get('Published', '')[:4] if doc_metadata.get('Published') else 'Unknown',
+        'Summary': doc_metadata.get('Summary', ''),
+        'pdf_url': f"https://arxiv.org/pdf/{arxiv_id}.pdf",
+        'total_chunks': len_chunks,
+        'ingested_at': datetime.now().isoformat()
+    }
+    await save_paper_metadata(user_id, paper_metadata)
+
+async def save_notes(user_id: str, paper_metadata: Dict[str, Any], paper_id: str, text: str) -> bool:
+    if paper_id not in paper_metadata:
+        return False
+    paper_metadata[paper_id]["notes"] = text
+    await save_paper_metadata(user_id, paper_metadata)  
+    return True
 
 def preprocess(user_id: str, doc: Document, arxiv_id: str) -> List[Document]:
     """
@@ -69,18 +106,6 @@ def preprocess(user_id: str, doc: Document, arxiv_id: str) -> List[Document]:
         }
             chunks.append(c)
     return chunks
-
-async def update_paper_metadata(user_id: str, paper_metadata: Dict[str, Any], doc_metadata: Dict[str, Any], arxiv_id: str, len_chunks: int) -> None:   
-    paper_metadata[arxiv_id] = {
-                'Title': doc_metadata.get('Title', 'Unknown'),
-                'Authors': doc_metadata.get('Authors', []),
-                'Published': doc_metadata.get('Published', '')[:4] if doc_metadata.get('Published') else 'Unknown',
-                'Summary': doc_metadata.get('Summary', ''),
-                'pdf_url': f"https://arxiv.org/pdf/{arxiv_id}.pdf",
-                'total_chunks': len_chunks,
-                'ingested_at': datetime.now().isoformat()  # Track when ingested
-            }
-    await save_paper_metadata(user_id, paper_metadata) 
 
 async def ingest_papers(user_id: str, paper_metadata: Dict[str, Any], vectorstore: QdrantVectorStore, arxiv_ids: List[str]) -> Dict[str, Any]:
     """
@@ -108,8 +133,28 @@ async def ingest_papers(user_id: str, paper_metadata: Dict[str, Any], vectorstor
             chunks = preprocess(user_id, doc, arxiv_id)
 
             try:
-                # Add chunks to vector store (async)
-                await vectorstore.aadd_documents(chunks)
+                # await vectorstore.aadd_documents(chunks)
+                # 1. Generate embeddings for the chunks
+                texts = [c.page_content for c in chunks]
+                embeddings = await vectorstore.embeddings.aembed_documents(texts)
+                # 2. Build Qdrant points
+                import uuid
+                points = [
+                    models.PointStruct(
+                        id=str(uuid.uuid4()),
+                        vector=emb,
+                        payload={
+                            "page_content": chunk.page_content,
+                            "metadata": chunk.metadata
+                        }
+                    )
+                    for chunk, emb in zip(chunks, embeddings)
+                ]
+                # 3. Upsert
+                await vectorstore.client.upsert(
+                    collection_name=vectorstore.collection_name,
+                    points=points
+                )
                 # Only update metadata if add succeeds
                 await update_paper_metadata(user_id, paper_metadata, doc.metadata, arxiv_id, len(chunks))
                 successful.append(arxiv_id)
@@ -133,13 +178,6 @@ async def ingest_papers(user_id: str, paper_metadata: Dict[str, Any], vectorstor
 
     return {"successful": successful, "failed": failed, "total_processed": total, "message": message}
 
-async def save_notes(user_id: str, paper_metadata: Dict[str, Any], paper_id: str, text: str) -> bool:
-    if paper_id not in paper_metadata:
-        return False
-    paper_metadata[paper_id]["notes"] = text
-    await save_paper_metadata(user_id, paper_metadata)  
-    return True
-
 async def delete_paper(user_id: str, paper_metadata: Dict[str, Any], vectorstore: QdrantVectorStore, paper_id: str) -> bool:
     """
     Delete all chunks of a given paper from Qdrant and remove its metadata.
@@ -156,13 +194,10 @@ async def delete_paper(user_id: str, paper_metadata: Dict[str, Any], vectorstore
                 models.FieldCondition(key="metadata.paper_id", match=models.MatchValue(value=paper_id)),
             ]
         )
-        # Run delete in thread
-        def _delete():
-            vectorstore.client.delete(
-                collection_name=vectorstore.collection_name,
-                points_selector=delete_filter
-            )
-        await asyncio.to_thread(_delete)
+        await vectorstore.client.delete(
+            collection_name=vectorstore.collection_name,
+            points_selector=delete_filter
+        )        
         # Remove metadata
         del paper_metadata[paper_id]
         await save_paper_metadata(user_id, paper_metadata)
@@ -175,16 +210,13 @@ async def delete_paper(user_id: str, paper_metadata: Dict[str, Any], vectorstore
 
 async def get_num_vectors(user_id: str, vectorstore: QdrantVectorStore) -> int:
     """Return total number of vectors belonging to the user."""
-    try:
-        # Run in thread
-        def _count():
-            return vectorstore.client.count(
-                collection_name=vectorstore.collection_name,
-                count_filter=models.Filter(
-                    must=[models.FieldCondition(key="metadata.user_id", match=models.MatchValue(value=user_id))]
-                )
+    try:  
+        result = await vectorstore.client.count(
+            collection_name=vectorstore.collection_name,
+            count_filter=models.Filter(
+                must=[models.FieldCondition(key="metadata.user_id", match=models.MatchValue(value=user_id))]
             )
-        result = await asyncio.to_thread(_count)
+        )
         return result.count
     except Exception as e:
         return 0

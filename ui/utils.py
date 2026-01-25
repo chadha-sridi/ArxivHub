@@ -1,7 +1,7 @@
 import re
 import gradio as gr
 from typing import List, Dict, Any, Tuple
-from config import ArxivHubVectorstore
+from config import get_vectorstore
 from ingestion import ingest_papers, save_notes, delete_paper
 
 def get_ingested_papers(user_paper_metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -105,6 +105,7 @@ async def submit_papers(
     if not valid_ids:
         return validation_message + "No valid arXiv IDs to process.", gr.update(value=""), gr.update(), gr.update(), user_paper_metadata
     
+    ArxivHubVectorstore = await get_vectorstore()
     unique_ids = list(set(valid_ids))
     result = await ingest_papers(user_id, user_paper_metadata, ArxivHubVectorstore ,unique_ids)
     
@@ -123,7 +124,8 @@ async def save_paper_notes(user_id: str, user_paper_metadata: Dict[str, Any], pa
 async def handle_delete_paper(user_id: str, user_paper_metadata: Dict[str, Any], paper_id: str):
     if not paper_id or paper_id == 'main_chat':
         return "Select a paper first", gr.update()
-        
+    
+    ArxivHubVectorstore = await get_vectorstore()
     success = await delete_paper(user_id, user_paper_metadata, ArxivHubVectorstore, paper_id)
     
     if success:

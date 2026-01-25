@@ -2,7 +2,7 @@ import re
 import gradio as gr
 from gradio_modal import Modal
 from graph import workflow as rag_workflow
-from config import ArxivHubVectorstore
+from config import get_vectorstore
 from core.schemas import RuntimeContext
 from ingestion import load_paper_metadata 
 from ui import (
@@ -20,7 +20,7 @@ async def chat_with_agent(message, history, user_id, user_metadata):
     # Runtime context
     runtime_context = RuntimeContext(
         user_id=user_id,
-        vectorstore=ArxivHubVectorstore,
+        vectorstore=await get_vectorstore(),
         metadata=user_metadata,
     )
     # Config for LangGraph (Thread isolation)

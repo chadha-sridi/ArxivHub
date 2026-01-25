@@ -66,7 +66,7 @@ def get_query_analysis_prompt() -> str:
 def get_generation_prompt(context_xml: str, summary: str) -> str:
     return f"""
     You are a world-class Research Scientist. 
-    Your goal is to answer the user question precisely includinng all the sub-questions using ONLY the relevant snippets provided in the context below.
+    Your goal is to answer the user question precisely includinng all the sub-questions using only the relevant snippets provided in the context below.
 
     <context>
     {context_xml}
@@ -76,8 +76,7 @@ def get_generation_prompt(context_xml: str, summary: str) -> str:
     1. **conversation summary usage** : Use the conversation summary if it helps frame or understand the current user query, or to help resolve references. Disregard it if the new query is a new topic.
     1. **Source Analysis**: Identify which snippets contain the facts needed to answer the user's query.
     2. **Strict Grounding**: Every sentence in your answer MUST be supported by at least one source. Use inline citations [1].
-    3. **No External Knowledge**: If the context does not have the answer, state that clearly.
-    4. **Mapping Verification**: In your <thinking> block, perform a 'Source-to-Claim' mapping.
+    3. **Mapping Verification**: In your <thinking> block, perform a 'Source-to-Claim' mapping.
     </instructions>
 
     Your response MUST follow this exact structure:
@@ -90,9 +89,9 @@ def get_generation_prompt(context_xml: str, summary: str) -> str:
     <answer>
     [Provide your well-cited, professional answer here. Use inline citations like [1] or [1, 2].]
 
+    Include source citation only if you actually used the sources.
     ---
     **Sources used in this response:**
-    - [Source Index] Arxiv ID: Title
     - [Source Index] Arxiv ID: Title
     </answer>
     """

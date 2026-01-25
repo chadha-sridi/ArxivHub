@@ -75,7 +75,7 @@ class QueryAnalysis(BaseModel):
 
 class DocRelevance(BaseModel):
     """Grade a single document's relevance to the question."""
-    grade: Literal["fully answers the question", "partially answers the question", "completely irrelevant"]
+    grade: Literal["relevant","fully answers the question", "partially answers the question", "completely irrelevant"]
     reasoning: str = Field(description="Briefly explain why this grade was given.")
 
 class CollectiveAudit(BaseModel):

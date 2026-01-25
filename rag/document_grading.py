@@ -8,28 +8,32 @@ async def grade_docs(state: State):
     logger.info("Launching parallel workers for individual document grading...")
     
     docs = state.get("retrievedDocs", [])
+    scores = state.get("confidenceScores", []) # Assumes scores are in state
     question = state.get("rewrittenQuestion") or state.get("originalQuestion")
-    
-    if not docs:
-        return {"relevancePassed": False, "unanswered": question}
+    relevance_threshold = 0.8 # threshold above which we automatically consider the document as relevant 
 
-    # structured grader
+    if not docs:
+        return {"relevancePassed": False}
+
     grader_llm = llm.with_structured_output(DocRelevance)
 
-    async def check_doc(doc):
+    async def check_doc(doc, score):
+        # If score is high, we don't call the LLM
+        if score >= relevance_threshold:
+            return doc, DocRelevance(grade="relevant", reasoning="Bypassed: High confidence score.")
+        
+        # Else run the LLM grader
         prompt = f"Question: {question}\n\nDocument: {doc.page_content}"
         result = await grader_llm.ainvoke(prompt)
         return doc, result
 
-    # Launch checks in parallel
-    tasks = [check_doc(d) for d in docs]
+    tasks = [check_doc(d, s) for d, s in zip(docs, scores)]
     results = await asyncio.gather(*tasks)
 
-    # Keep only documents that are relevant to the question (fully and partially)
+    # Filter out only those the LLM (or the bypass) deemed irrelevant
     filtered_docs = [
         doc for doc, report in results 
         if report.grade != "completely irrelevant"
     ]
     
-    logger.info(f"Filtered {len(docs)} down to {len(filtered_docs)} relevant documents.")
     return {"retrievedDocs": filtered_docs}
